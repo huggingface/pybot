@@ -6158,6 +6158,36 @@ def _declared_for(allowed, understood):
             if any(topic in (judged.get(name) or ()) for topic in topics)}
 
 
+def _key_index(entries):
+    """The entries that could pass _the_key_names_the_thing, by phrase length and first-word form.
+
+    An entry passes that check only when one of its key phrases has exactly as many words as the
+    thing and its first word shares a form with the thing's first word, so those two facts index
+    the scan: the rest of the deck cannot reach the check and is skipped whole. Positions are kept
+    so the candidates are read in deck order, which keeps the best-rank tie-break the same.
+    """
+    got = _KEY_INDEX.get(id(entries))
+    if got is not None and got[0] is entries:
+        return got[1]
+    index = {}
+    for pos, item in enumerate(entries):
+        for part in item.key:
+            for alternative in (part if isinstance(part, tuple) else (part,)):
+                if not isinstance(alternative, str):
+                    continue
+                words = alternative.lower().split()
+                if not words:
+                    continue
+                for form in _forms(words[0]):
+                    index.setdefault((len(words), form), []).append(pos)
+    _KEY_INDEX.clear()       # the list is kept beside its index, so its id cannot be reused
+    _KEY_INDEX[id(entries)] = (entries, index)
+    return index
+
+
+_KEY_INDEX = {}
+
+
 def _defines(understood, forms, typed, entries, reject=None):
     """The best entry that defines the thing a definition line asks about, or None.
 
@@ -6174,7 +6204,12 @@ def _defines(understood, forms, typed, entries, reject=None):
     purpose = _asks_what_it_is_for(said)
     best = None
     best_rank = None
-    for item in entries:
+    index = _key_index(entries)
+    positions = set()
+    for form in _forms(thing[0]):
+        positions.update(index.get((len(thing), form), ()))
+    for pos in sorted(positions):
+        item = entries[pos]
         if reject is not None and reject(item):
             continue
         # A guard is a test of the whole reading of the line, so it holds here too: "what is a
