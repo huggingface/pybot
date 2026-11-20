@@ -124,9 +124,9 @@ class ResetClearsTheConversation(unittest.TestCase):
         turns_remembered = []
         real = pybot.answer
 
-        def watching(runtime, text, memory):
+        def watching(runtime, text, memory, **options):
             turns_remembered.append(len(memory.get("turns", [])))
-            return real(runtime, text, memory)
+            return real(runtime, text, memory, **options)
 
         with mock.patch.object(pybot, "answer", watching):
             chat(["hello", "how are you", "/reset", "hello", "/exit"])
