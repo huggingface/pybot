@@ -9,6 +9,7 @@ PyBot itself is the `bot` package next to this file, exactly as the swarm of age
 This file only adds the command line. It holds no chatbot logic of its own.
 """
 import argparse
+import inspect
 import os
 import random
 import sys
@@ -56,18 +57,37 @@ def load_bot():
     return runtime
 
 
-def answer(runtime, text, memory):
-    """One turn: (reply, module, seconds).
+def _format_error(runtime, error):
+    fmt = getattr(runtime, "format_error", None)
+    if callable(fmt):
+        return fmt(error)
+    name = type(error).__name__
+    try:
+        msg = str(error)
+    except Exception:
+        return name
+    return f"{name}: {msg}" if msg else name
 
-    Mirrors bot/__main__.py: the reply is one non-empty line, and a turn never raises.
-    """
+
+def _accepts_errors(fn):
+    try:
+        params = inspect.signature(fn).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(p.name == "errors" or p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
+
+
+def answer(runtime, text, memory, *, errors=None):
+    """One turn: (reply, module, seconds)."""
     start = time.perf_counter()
     try:
-        result = runtime.turn(text, memory)
+        result = runtime.turn(text, memory, errors=errors) if errors is not None and _accepts_errors(runtime.turn) else runtime.turn(text, memory)
         reply = " ".join(str(result["reply"]).split()) or "Hello!"
         module = result.get("module")
-    except Exception:  # noqa: BLE001 - keep the bot's interface: always one reply
+    except Exception as error:
         reply, module = "Hello!", None
+        if errors is not None:
+            errors.append(("turn", "runtime", _format_error(runtime, error)))
     return reply, module, time.perf_counter() - start
 
 
@@ -75,22 +95,36 @@ def details(module, seconds):
     return "[module: %s | %.0f ms]" % (module or "none", seconds * 1000)
 
 
+def report_load_errors(runtime):
+    for name, error in getattr(runtime, "LOAD_ERRORS", ()):
+        print("[load error: %s | %s]" % (name, error), file=sys.stderr, flush=True)
+
+
+def report_turn_errors(errors):
+    for phase, name, error in errors:
+        print("[error: %s/%s | %s]" % (phase, name, error), file=sys.stderr, flush=True)
+
+
 def one_shot(runtime, args):
     """-p without -i: print the reply to one message and exit."""
-    reply, module, seconds = answer(runtime, args.prompt, {})
+    errors = [] if args.verbose else None
+    reply, module, seconds = answer(runtime, args.prompt, {}, errors=errors)
     print(reply, flush=True)
     if args.verbose:
         print(details(module, seconds), file=sys.stderr)
+        report_turn_errors(errors)
 
 
 def pipe(runtime, args):
     """Input that is not a terminal: one reply per line, like `python -m bot`."""
     memory = {}
     for line in sys.stdin:
-        reply, module, seconds = answer(runtime, line.rstrip("\r\n"), memory)
+        errors = [] if args.verbose else None
+        reply, module, seconds = answer(runtime, line.rstrip("\r\n"), memory, errors=errors)
         print(reply, flush=True)
         if args.verbose:
             print(details(module, seconds), file=sys.stderr, flush=True)
+            report_turn_errors(errors)
 
 
 def opening():
@@ -152,10 +186,12 @@ def chat(runtime, args):
             continue
         if not command:
             continue
-        reply, module, seconds = answer(runtime, text, memory)
+        errors = [] if args.verbose else None
+        reply, module, seconds = answer(runtime, text, memory, errors=errors)
         print(BOT_PREFIX + reply)
         if args.verbose:
             print(details(module, seconds))
+            report_turn_errors(errors)
         print()
 
 
@@ -171,8 +207,7 @@ def main(argv=None):
                         help="with -p: keep chatting after the first reply")
     parser.add_argument("-s", "--seed", type=int, metavar="N",
                         help="seed for PyBot's choice of wording, to get the same replies again")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="after each reply, show the module that produced it and the time it took")
+    parser.add_argument("-v", "--verbose", action="store_true", help="show reply module, timing, and module errors")
     parser.add_argument("--version", action="version",
                         version="pybot %s (bot at commit %s)" % (__version__, SOURCE_COMMIT[:12]))
     args = parser.parse_args(argv)
@@ -185,6 +220,9 @@ def main(argv=None):
     runtime = load_bot()
     if interactive:
         print("\r" + " " * 16 + "\r", end="", file=sys.stderr, flush=True)
+    if args.verbose:
+        report_load_errors(runtime)
+    if interactive:
         chat(runtime, args)
     elif args.prompt is not None:
         one_shot(runtime, args)

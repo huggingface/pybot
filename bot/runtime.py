@@ -13,7 +13,7 @@ filename, in three phases:
 
 Then after(text, reply, memory) runs in every module that defines it, and the runtime appends
 {"user": text, "bot": reply, "module": name} to memory["turns"] (read it, never change it).
-A module that fails is skipped; a turn never fails.
+A hook that raises is skipped unless strict mode is on.
 """
 import copy
 import importlib
@@ -25,13 +25,24 @@ ARBITER = "arbiter"
 FALLBACK = "Hello!"
 
 
-def load_modules():
+def format_error(error):
+    name = type(error).__name__
+    try:
+        msg = str(error)
+    except Exception:
+        return name
+    return f"{name}: {msg}" if msg else name
+
+
+def load_modules(*, errors=None):
     """[(name, priority, module)], highest PRIORITY first, then by filename."""
     loaded = []
     for entry in pkgutil.iter_modules(modules.__path__):
         try:
             module = importlib.import_module(f"{modules.__name__}.{entry.name}")
-        except Exception:  # noqa: BLE001, S112 - preserve the bot interface
+        except Exception as error:
+            if errors is not None:
+                errors.append((entry.name, format_error(error)))
             continue
         priority = getattr(module, "PRIORITY", 0)
         if isinstance(priority, bool) or not isinstance(priority, (int, float)):
@@ -46,7 +57,10 @@ def _hooks(name):
             if callable(getattr(module, name, None))]
 
 
-_MODULES = load_modules()
+_load_errors = []
+_MODULES = load_modules(errors=_load_errors)
+LOAD_ERRORS = tuple(_load_errors)
+del _load_errors
 _OBSERVERS = _hooks("observe")
 _HANDLERS = _hooks("respond")
 _AFTER = _hooks("after")
@@ -61,14 +75,18 @@ def _copy(memory):
         return memory
 
 
-def _choose(text, memory, candidates):
+def _choose(text, memory, candidates, errors=None, strict=False):
     """The arbiter's pick, as an index into candidates; 0 when it fails or returns nonsense."""
     if _ARBITER is None or len(candidates) < 2:
         return 0
     views = [dict(c) for c in candidates]
     try:
         picked = _ARBITER(text, memory, views)
-    except Exception:  # noqa: BLE001 - preserve the bot interface
+    except Exception as error:
+        if strict:
+            raise
+        if errors is not None:
+            errors.append(("choose", ARBITER, format_error(error)))
         return 0
     if isinstance(picked, int) and not isinstance(picked, bool) and 0 <= picked < len(views):
         return picked
@@ -79,35 +97,47 @@ def _choose(text, memory, candidates):
     return 0
 
 
-def turn(text, memory):
+def turn(text, memory, strict=False, *, errors=None):
     """One turn: {"reply", "module", "candidates"}. Updates memory in place."""
-    for _, _, observe in _OBSERVERS:
+    for name, _, observe in _OBSERVERS:
         try:
             observe(text, memory)
-        except Exception:  # noqa: BLE001, S112 - preserve the bot interface
+        except Exception as error:
+            if strict:
+                raise
+            if errors is not None:
+                errors.append(("observe", name, format_error(error)))
             continue
     candidates, copies = [], []
     for name, priority, respond in _HANDLERS:
         mine = _copy(memory)
         try:
             answer = respond(text, mine)
-        except Exception:  # noqa: BLE001, S112 - preserve the bot interface
+        except Exception as error:
+            if strict:
+                raise
+            if errors is not None:
+                errors.append(("respond", name, format_error(error)))
             continue
         if isinstance(answer, str) and answer.strip():
             candidates.append({"module": name, "priority": priority, "reply": answer})
             copies.append(mine)
     if candidates:
-        index = _choose(text, memory, candidates)
+        index = _choose(text, memory, candidates, errors=errors, strict=strict)
         reply, module = candidates[index]["reply"], candidates[index]["module"]
         if copies[index] is not memory:
             memory.clear()
             memory.update(copies[index])
     else:
         reply, module = FALLBACK, None
-    for _, _, after in _AFTER:
+    for name, _, after in _AFTER:
         try:
             after(text, reply, memory)
-        except Exception:  # noqa: BLE001, S112 - preserve the bot interface
+        except Exception as error:
+            if strict:
+                raise
+            if errors is not None:
+                errors.append(("after", name, format_error(error)))
             continue
     turns = memory.get("turns")
     if not isinstance(turns, list):
