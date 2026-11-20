@@ -5210,8 +5210,7 @@ WISH_DEAD_TAIL = (r"(?=\s*(?:$|[.!?]|any\s?more|any\s+longer|at\s+all|no\s?more|
 # exam went badly" is still an exam.
 _SOFTENING = (r"(?:honestly|tbh|for\s+real|seriously|genuinely|no\s+joke|i\s+mean\s+it|"
               r"really|truthfully|lol)\b(?=\s*(?:$|[.!?]))")
-WISH_DEAD_NO_REASON = (r"(?!\s*+,\s*+(?!any\s?more|any\s+longer|at\s+all|no\s?more|now\b|"
-                       r"tonight\b|today\b|" + _SOFTENING + r"))")
+WISH_DEAD_NO_REASON = r"(?!\s*,\s*(?!\s|any\s?more|any\s+longer|at\s+all|no\s?more|now\b|tonight\b|today\b|" + _SOFTENING + r"))"
 WISH_DEAD = (
     r"\bi\s+wish\w*\s+i\s+(?:was|were|am)\s+(?:dead|gone|never\s+born)\b"
     # "dead" and "gone" are ordinary words as often as they are the wish, and every phrase below
