@@ -1414,6 +1414,18 @@ def _where_the_swap_goes(before, phrase):
     places = list(before or ())
     if not places or not phrase:
         return None
+    if set(phrase) & {"times", "multiplied", "plus", "minus", "subtract", "divided", "divide", "squared", "cubed"}:
+        return None
+    digit_words = frozenset(normalize.DIGIT_WORDS.values()) - {"one"}
+    nums = sum(any(ch.isdigit() for ch in w) or w in digit_words for w in phrase)
+    if nums >= 2:
+        earlier_nums = [i for i, w in enumerate(places) if any(ch.isdigit() for ch in w) or w in digit_words]
+        if len(earlier_nums) != nums:
+            return None
+        at, end = earlier_nums[0], earlier_nums[-1] + 1
+        while end < len(places) and (places[end] in normalize.COUNT_UNITS or places[end] in ("a", "an", "each", "per", "every")):
+            end += 1
+        return at, end, "number"
     for word in phrase:
         for at, earlier in enumerate(places):
             kind = _the_same_kind(word, earlier)

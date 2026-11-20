@@ -68,6 +68,8 @@ _BIN_OPS = {
     ast.Mod: operator.mod,
 }
 _UNARY_OPS = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+_FOLLOWUP_LEAD = re.compile(r"^\s*(?:(?:ok(?:ay)?|so|well|wait|no|nah|sorry|actually|oops|nope)[,\s]+)*(?:(?:and\s+|or\s+|also\s+)?(?:how|what)\s+about\s+|(?:and|or|also)\s+)?", re.I)
+_EXPLICIT_OP = re.compile(r"\b(?:times|multiplied\s+by|plus|minus|take\s+away|subtract|divided\s+by|divide\s+\d[\d.,]*\s+by|squared|cubed|to\s+the\s+power|raised\s+to)\b|[+*^]|(?<=\d)\s+[-/]\s+(?=[-+(\d])", re.I)
 
 
 def _eval(node):
@@ -5079,7 +5081,28 @@ def solve(text, understood, memory):
                    _how_long_ago(clean)):
         if answer:
             return answer
-    return _calc(clean)
+    direct = _calc(clean)
+    if direct:
+        return direct
+    turns = (memory or {}).get("turns") if isinstance(memory, dict) else None
+    last = turns[-1] if isinstance(turns, list) and turns else None
+    after_sum = isinstance(last, dict) and last.get("module") == "answers" and bool(re.match(r"^(?:Same as before:\s*)?That's\s", str(last.get("bot") or "")))
+    for line in (clean, " ".join(str(text).lower().split())):
+        lead = _FOLLOWUP_LEAD.match(line)
+        if not lead or not line[:lead.end()].strip():
+            continue
+        rest = line[lead.end():].rstrip("?").strip()
+        if after_sum and re.fullmatch(r"[-+]?\d+(?:\.\d+)?", rest) and isinstance(last.get("user"), str):
+            prev = _FOLLOWUP_LEAD.sub("", " ".join(last["user"].lower().split()), count=1)
+            swapped = re.sub(r"\d+(?:,\d{3})*(?:\.\d+)?", rest, prev, count=1)
+            said = _calc(swapped)
+            if said:
+                return said
+        if (_EXPLICIT_OP.search(rest) or after_sum) and not re.search(r"\b\d{4}-\d{1,2}-\d{1,2}\b", rest):
+            said = _calc(rest)
+            if said:
+                return said
+    return None
 
 
 # The unit facts people ask for by name ("how many grams in an ounce") are computed in
