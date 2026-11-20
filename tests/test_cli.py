@@ -157,5 +157,31 @@ class OneShotAndPipeStayPlain(unittest.TestCase):
         self.assertEqual(len(mine.stdout.splitlines()), 5)
 
 
+class MathsFollowUpTest(unittest.TestCase):
+    def test_followup_sums(self):
+        typed = "How much is 32 times 23\nhow about 43 times 342\nwhat about 10?\nsorry, 12 times 11?\nand what about 8 * 9?\n"
+        result = run(["-s", "0"], stdin=typed)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.splitlines(), ["That's 736.", "That's 14,706.", "That's 3,420.", "That's 132.", "That's 72."])
+
+    def test_followup_single_number(self):
+        typed = "How much is 32 times 23\nwhat about 343?\n"
+        result = run(["-s", "0"], stdin=typed)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.splitlines(), ["That's 736.", "That's 7,889."])
+
+    def test_non_sums_unchanged(self):
+        typed = "what is the average of 4, 8 and 12?\nhow about 6 and 20?\n"
+        result = run(["-s", "0"], stdin=typed)
+        self.assertEqual(result.returncode, 0)
+        lines = result.stdout.splitlines()
+        self.assertEqual(lines[0], "The average is 8.")
+        self.assertIn("13", lines[1])
+
+        egg = run(["-s", "0"], stdin="how long do i boil an egg?\nor 10-12?\n")
+        self.assertEqual(egg.returncode, 0)
+        self.assertNotIn("-2", egg.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
