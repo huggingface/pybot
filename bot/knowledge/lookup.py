@@ -27,6 +27,7 @@ line past the entry's avoid list, not even an ambiguous one ("brest" is a whole-
 question neither way).
 """
 import re
+from functools import lru_cache
 try:  # the reading of a dream, so a dream of a thing is not the thing
     from ..memory import dream as _DREAM
 except Exception:  # noqa: BLE001 - a reading that cannot be imported just adds no rule
@@ -1806,6 +1807,7 @@ _FORMS_CACHE = {}
 # five times what a real conversation reaches, and it is what stops a very long one from holding
 # a frozenset for every word it has ever seen.
 _FORMS_CACHE_KEEP = 50000
+_PHRASE_CACHE_KEEP = 250000
 
 
 
@@ -2537,7 +2539,7 @@ def _wanted(phrase):
             got = tuple(frozenset((word,)) for word in phrase.lower().split())
         else:
             got = tuple(_forms(word) for word in phrase.lower().split())
-        if len(_WANTED_CACHE) >= _FORMS_CACHE_KEEP:
+        if len(_WANTED_CACHE) >= _PHRASE_CACHE_KEEP:
             _WANTED_CACHE.clear()
         _WANTED_CACHE[phrase] = got
     return got
@@ -2583,7 +2585,7 @@ def _wanted_bare(phrase):
     words = phrase.lower().split()
     kept = [word for word in words if word not in _ARTICLE_WORDS]
     bare = tuple(_forms(word) for word in kept) if len(kept) >= _MIN_BARE_WORDS and len(kept) < len(words) else None
-    if len(_WANTED_CACHE) >= _FORMS_CACHE_KEEP:
+    if len(_WANTED_CACHE) >= _PHRASE_CACHE_KEEP:
         _WANTED_CACHE.clear()
     _WANTED_CACHE[("bare", phrase)] = (bare,)
     return bare
@@ -2632,7 +2634,7 @@ def _shape(phrase):
     if got is None:
         words = tuple(phrase.lower().split())
         got = (words, PHRASE_WEIGHT if len(words) > 1 else WORD_WEIGHT)
-        if len(_SHAPE_CACHE) >= _FORMS_CACHE_KEEP:
+        if len(_SHAPE_CACHE) >= _PHRASE_CACHE_KEEP:
             _SHAPE_CACHE.clear()
         _SHAPE_CACHE[phrase] = got
     return got
@@ -2856,7 +2858,7 @@ def _the_same_words(phrase):
 
 
 _PHRASE_OTHER_SPELLINGS = {}
-_OTHER_SPELLINGS_KEEP = 4000
+_OTHER_SPELLINGS_KEEP = 120000
 
 
 def _work_out_the_same_words(phrase):
@@ -2943,7 +2945,7 @@ def _phrase_found(forms, phrase):
 
 
 _PART_FORMS = {}
-_PART_FORMS_KEEP = 20000
+_PART_FORMS_KEEP = 200000
 
 
 def _part_forms(part):
@@ -6049,6 +6051,11 @@ def _said_as_a_report(understood, words, entries, reject=None):
     return _the_best_entry(second, entries, reject, False)
 
 
+@lru_cache(maxsize=4096)
+def _name_words(phrase):
+    return frozenset(phrase.lower().split())
+
+
 def _the_name_card(typed, entries, reject=None, allowed=None):
     """The entry that is *named* the line, or None.
 
@@ -6064,6 +6071,8 @@ def _the_name_card(typed, entries, reject=None, allowed=None):
     question meant the pizza, not the pizza card.
     """
     said = set(typed)
+    if len(said) < 2:
+        return None
     found = []
     for item in entries:
         if getattr(item, "domain", None) not in NAME_ALONE_DOMAINS:
@@ -6079,7 +6088,7 @@ def _the_name_card(typed, entries, reject=None, allowed=None):
         alternatives = part if isinstance(part, tuple) else (part,)
         if not alternatives or not isinstance(alternatives[0], str):
             continue
-        phrase = set(alternatives[0].lower().split())
+        phrase = _name_words(alternatives[0])
         if len(phrase) >= 2 and phrase == said:
             found.append(item)
     if not found:
@@ -6320,7 +6329,7 @@ def leans_on_a_subject(understood):
 # the answer is the same each time. The key is the reading itself, and the entries list is kept
 # with it so a freed list's id cannot be reused for a different knowledge base.
 _ROWS_CACHE = {}
-_ROWS_KEEP = 40
+_ROWS_KEEP = 256
 
 
 # A word of the question half that more than this many entries key on is the vocabulary of
