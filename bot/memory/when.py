@@ -272,6 +272,16 @@ PLAN_VERB_ASK = re.compile(
     r"back|home|on)\b", re.I)
 
 
+def current_calendar_period(text):
+    """The current month or year asked for by a complete calendar question."""
+    line = " ".join(str(text or "").lower().split()).rstrip("?!. ")
+    match = re.fullmatch(
+        r"(?:(?:what|which) (month|year) (?:is it|are we in)"
+        r"|what(?:['’]?s| is) the (?:current )?(month|year))(?: (?:today|now|right now))?", line)
+    if match:
+        return match.group(1) or match.group(2)
+
+
 def asks_what_today_is(text):
     """"What day is it", "what's the date", "what date is it today": the calendar now.
 
@@ -282,7 +292,7 @@ def asks_what_today_is(text):
     the answer, and the calendar is read where the calendar is read.
     """
     line = " ".join(str(text or "").split()).rstrip("?!. ")
-    return bool(CALENDAR_NOW.match(line))
+    return bool(CALENDAR_NOW.match(line) or current_calendar_period(line))
 
 
 def _more_than_one_day(memory):

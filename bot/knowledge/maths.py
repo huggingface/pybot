@@ -19,6 +19,7 @@ from fractions import Fraction
 
 from ..memory.saving import a_rate_put_right, the_money_already_held, the_pot_said_alone
 from ..memory.topics import in_a_safety_thread
+from ..memory.when import current_calendar_period
 from . import units
 from .lookup import entry
 
@@ -4706,6 +4707,12 @@ def _today(clean):
     import datetime
     text = _plain(clean)
     today = datetime.date.today()
+
+    period = current_calendar_period(text)
+    if period == "month":
+        return f"It's {_MONTH_TITLE[today.month - 1]}."
+    if period == "year":
+        return f"It's {today.year}."
 
     if re.fullmatch(_TODAY_ASK, text):
         return f"It's {_day_text(today)}."
