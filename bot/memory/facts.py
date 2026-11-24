@@ -11290,12 +11290,14 @@ def _extract(text, question=False):
             value = found.get(key)
             if isinstance(value, list):
                 value = value[0] if value else None
+            raw_value = value
             if isinstance(value, (int, float)):
                 value = str(value)  # an age or a budget is kept as a number
             if not isinstance(value, str) or not value.strip():
                 continue
             if not a_value(value):
                 continue
-            found["correction"] = {"to": _tidy(value), "from": None}
+            found["correction"] = {"to": _tidy(value), "from": None,
+                                   "slot": key, "slot_value": raw_value}
             break
     return found

@@ -16464,6 +16464,14 @@ def _respond(text, memory, as_said=True):
     # The reading the person is looking at ("the gauge says 0.5" after the boiler answer) is
     # checked against the range the bot's own line stated, because the echo only says the number
     # back: whether it is the number is the whole of the question.
+    # A bare verdict that repeats the one just answered is the knowledge answer's to hand back,
+    # not a new generic ruling from the chat pool.
+    turns = memory.get("turns") if isinstance(memory, dict) else None
+    previous = str(turns[-1].get("user") or "") if isinstance(turns, list) and turns else ""
+    if (previous and verdict_reply.A_DOUBT_ABOUT_THE_THING.search(clean)
+            and verdict_reply.A_DOUBT_ABOUT_THE_THING.search(previous)
+            and verdict_reply._last_module(memory) == "answers"):
+        return None
     reading = reading_reply.reply_for(clean, memory)
     if reading:
         return reading

@@ -3147,7 +3147,7 @@ PAIR_WITHOUT_A_MARKER = (
 NOT_A_NEW_VALUE = frozenset("""a an the me you it that this these those my your his her our their
 thanks thank sure fair right wrong now then today tomorrow yesterday fine bad good great sorry
 please yes yeah no not ok okay yet even both all much many one two three too so there here what
-why how who when where true false""".split())
+why how who when where true false im i'm i’m i am its it's it’s it is""".split())
 
 
 def _a_correction_without_a_marker(text, memory):

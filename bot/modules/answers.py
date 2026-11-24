@@ -8430,6 +8430,8 @@ def respond(text, memory):
         # left to the readers as before ("cheers. also im skint till friday" is the money line).
         return None
     from ..compose import fallback as _the_composer
+    if _the_composer.reads_as_small_talk(text, memory):
+        return None
     if _the_composer.the_day_remarked(text):
         # The whole line says what the day is like ("windy as anything", "cold next week"). Nothing
         # is being asked and nothing is being looked up, and an entry is reached by a word: "wind"

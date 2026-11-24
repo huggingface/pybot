@@ -375,6 +375,8 @@ def _the_things_the_verdict_is_about(memory, line):
         thing = _the_thing_they_named(one)
         if thing:
             found.append((one, thing, order[index + 1:]))
+            if ASKS_A_VERDICT.match(one) and VERDICT.search(one):
+                break
             if len(found) >= THE_MOST_THINGS_A_VERDICT_TRIES:
                 break
     return found

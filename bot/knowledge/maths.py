@@ -46,6 +46,21 @@ def _number(value):
     return shown.rstrip("0").rstrip(".")
 
 
+_PLAIN_NUMBER = re.compile(
+    r"[+-]?(?:\d+(?:\.\d+)?|\.\d+|\d{1,3}(?:,\d{3})+(?:\.\d+)?)")
+_ZERO_DENOMINATOR = re.compile(
+    r"(?<![\w.])(?:\d+(?:\.\d+)?|\.\d+)\s*/\s*0+(?:\.0+)?(?![\d.])")
+
+
+def _number_value(text):
+    """A complete finite number, or None for a malformed numeric token."""
+    raw = str(text or "").strip()
+    if not _PLAIN_NUMBER.fullmatch(raw):
+        return None
+    value = float(raw.replace(",", ""))
+    return None if value != value or abs(value) == float("inf") else value
+
+
 def _parse(text):
     """The numbers in a line, in order."""
     found = []
@@ -139,7 +154,9 @@ def _root(clean):
     match = re.search(r"(?:square root(?: of)?|sqrt|root(?: of)?)\s*([\d,.]+)", clean)
     if not match:
         return None
-    value = float(match.group(1).replace(",", ""))
+    value = _number_value(match.group(1))
+    if value is None:
+        return None
     if value < 0:
         return "A negative number has no real square root."
     root = value ** 0.5
@@ -153,7 +170,9 @@ def _roots(clean):
     match = re.search(r"(square root|cube root)\s*(?:of|is)?\s*(-?[\d,.]+)", clean)
     if not match:
         return None
-    value = float(match.group(2).replace(",", ""))
+    value = _number_value(match.group(2))
+    if value is None:
+        return None
     if match.group(1) == "cube root":
         root = (-1 if value < 0 else 1) * abs(value) ** (1 / 3)
         exact = round(root) ** 3 == value
@@ -315,7 +334,9 @@ def _fraction_of(clean):
     match = re.search(r"\b(\d+)\s*/\s*(\d+)\s+of\s+([\d,.]+)", clean)
     if match:
         top, bottom = float(match.group(1)), float(match.group(2))
-        amount = float(match.group(3).replace(",", ""))
+        amount = _number_value(match.group(3))
+        if amount is None:
+            return None
         label = f"{_number(top)}/{_number(bottom)}"
     else:
         match = re.search(r"\b(a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
@@ -330,7 +351,9 @@ def _fraction_of(clean):
             said = next((word for word, number in _COUNTS.items() if number == count), said)
         part, whole = _FRACTIONS[match.group(2)]
         top, bottom = part * count, whole
-        amount = float(match.group(3).replace(",", ""))
+        amount = _number_value(match.group(3))
+        if amount is None:
+            return None
         label = " ".join(word for word in match.group(1, 2) if word)
         if said.isdigit() or (match.group(1) or "").isdigit():
             label = f"{said} {match.group(2)}"  # "3 quarters" is said "three quarters"
@@ -1046,7 +1069,9 @@ def _percent(clean):
     after = re.search(r"(?:costs?|priced at|is|are|was)\s+(?:£|\$)?([\d,.]+)\D.*?"
                       r"(\d+(?:\.\d+)?)\s*(?:%|percent|per cent)\s*off", clean)
     if after:
-        total, part = _amount(after.group(1)), _amount(after.group(2))
+        total, part = _number_value(after.group(1)), _number_value(after.group(2))
+        if total is None or part is None:
+            return None
         amount = total * part / 100
         return (f"{_number(part)}% off {_number(total)} leaves {_number(total - amount)} "
                 f"(you save {_number(amount)}).")
@@ -1062,9 +1087,11 @@ def _percent(clean):
         match = re.search(r"what(?:'s| is)\s*(\d+(?:\.\d+)?)\s*(of|off)\s*([\d,.]+)\s*%", clean)
         if not match:
             return None
-        part, kind, total = float(match.group(1)), match.group(2), float(match.group(3).replace(",", ""))
+        part, kind, total = _number_value(match.group(1)), match.group(2), _number_value(match.group(3))
     else:
-        part, kind, total = float(match.group(1)), match.group(2), float(match.group(3).replace(",", ""))
+        part, kind, total = _number_value(match.group(1)), match.group(2), _number_value(match.group(3))
+    if part is None or total is None:
+        return None
     amount = total * part / 100
     if kind == "off":
         return (f"{_number(part)}% off {_number(total)} leaves {_number(total - amount)} "
@@ -1077,9 +1104,9 @@ def _percentage_change(clean):
                       r"([\d,.]+)\s+to\s+([\d,.]+)", clean)
     if not match:
         return None
-    start = float(match.group(1).replace(",", ""))
-    end = float(match.group(2).replace(",", ""))
-    if not start:
+    start = _number_value(match.group(1))
+    end = _number_value(match.group(2))
+    if start is None or end is None or not start:
         return None
     change = (end - start) / start * 100
     word = "increase" if change >= 0 else "decrease"
@@ -1103,28 +1130,28 @@ def _what_percent(clean):
     part = total = None
     match = re.search(r"what (?:percentage|percent) of ([\d,.]+) is ([\d,.]+)", clean)
     if match:
-        total, part = _amount(match.group(1)), _amount(match.group(2))
+        total, part = _number_value(match.group(1)), _number_value(match.group(2))
     if part is None:
         match = re.search(r"what (?:percentage|percent) (?:is )?([\d,.]+) (?:of|out of) "
                           r"([\d,.]+)", clean)
         if match:
-            part, total = _amount(match.group(1)), _amount(match.group(2))
+            part, total = _number_value(match.group(1)), _number_value(match.group(2))
     if part is None:
         # The same sum the other way round: "20 is what percent of 80" puts the part first and
         # the question in the middle, which nothing read, so the line got an ack.
         match = re.search(r"([\d,.]+)\s+(?:is\s+)?what\s+(?:percentage|percent)\s+of\s+([\d,.]+)",
                           clean)
         if match:
-            part, total = _amount(match.group(1)), _amount(match.group(2))
+            part, total = _number_value(match.group(1)), _number_value(match.group(2))
     if part is None:
         match = re.search(r"([\d,.]+) (?:out of|of) ([\d,.]+) (?:as a |in )?"
                           r"(?:percentage|percent)", clean)
         if match:
-            part, total = _amount(match.group(1)), _amount(match.group(2))
+            part, total = _number_value(match.group(1)), _number_value(match.group(2))
     if part is None:
         match = re.search(r"([\d,.]+) as a (?:percentage|percent) of ([\d,.]+)", clean)
         if match:
-            part, total = _amount(match.group(1)), _amount(match.group(2))
+            part, total = _number_value(match.group(1)), _number_value(match.group(2))
     if part is None or not total:
         return None
     share = part / total * 100
@@ -5033,6 +5060,15 @@ def _wage_rate(text):
 def solve(text, understood, memory):
     """A computed maths reply, or None when the line is not a calculation."""
     clean = (understood or {}).get("clean") or " ".join(str(text).lower().split())
+    if _ZERO_DENOMINATOR.search(clean):
+        return None
+    try:
+        return _solve(clean, memory)
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return None
+
+
+def _solve(clean, memory):
     # Nothing here answers while the bot's last real answer was an emergency: a number said out
     # loud in that thread is not a sum to work out, it is the person still in the emergency.
     if in_a_safety_thread(memory):

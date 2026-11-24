@@ -19,6 +19,7 @@ import re
 
 from ..understanding import lexicon
 from ..understanding.kinds import NEGATIVE, POSITIVE
+from ..understanding.references import is_placeholder_it
 from .filler import without_the_shrug
 from . import quotes as quoted
 
@@ -1945,6 +1946,8 @@ def is_follow_up(text, memory):
     if _switches(clean):
         return False
     found = words(text)
+    if a_placeholder_pronoun(text):
+        return False
     if len(found) > 16:
         return False
     topic_words = set(record.get("words") or [])
@@ -6808,7 +6811,8 @@ A_NEW_ONE = re.compile(
 def a_placeholder_pronoun(line):
     """True when the pronoun in the line is a hole for a subject of its own, not a pointer."""
     text = str(line or "")
-    return bool(PLACEHOLDER_PRONOUN.search(text) and not A_NEW_ONE.search(text))
+    return bool((PLACEHOLDER_PRONOUN.search(text) or is_placeholder_it(text))
+                and not A_NEW_ONE.search(text))
 
 
 def the_ask_about_the_thing_it_points_at(understood, memory):

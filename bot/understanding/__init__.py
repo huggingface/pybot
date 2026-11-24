@@ -1950,7 +1950,10 @@ def _read_line(text, memory=None):
             if previous_topic is None:
                 previous_topic = topics.detect_topic(earlier, None, earlier_entities)[0]
 
-    ref = references.resolve(line, read, previous, previous_entities, previous_topic)
+    car_fault = cars.a_broken_car_is_the_subject(
+        line["clean"], _user_lines(memory, cars.LOOKBACK))
+    ref = references.resolve(line, read, previous, previous_entities, previous_topic,
+                             car_fault=car_fault)
     # "any word on the job" asks about the job: the word in front only says what kind of answer
     # is wanted, and read whole the line was about the word it was asked with (the topic was
     # language-and-writing, and the job never came up). The thing after the link is what the line
@@ -1995,6 +1998,12 @@ def _read_line(text, memory=None):
     topic, score = topics.detect_topic(topic_line, inherited, entities, asks_something)
     # the topics of this line alone, best first: what a module that declares ANSWERS matches
     ranked = [name for name, points in topics.rank_topics(topic_line, None, entities, asks_something)]
+    if ref["followup"] and own_topic is None and previous_topic:
+        topic, score = previous_topic, CARRY_TOPIC
+        ranked = [previous_topic] + [name for name in ranked if name != previous_topic]
+    if car_fault and set(line["norm"]) & topics.DRIVES:
+        topic, score = "cars", CARRY_TOPIC
+        ranked = ["cars"] + [name for name in ranked if name != "cars"]
     # A question put to the bot itself names no subject of its own, so it read as naming nothing:
     # "do you have a name", "what model are u", "where are you", "can you make mistakes",
     # "should i call you anything".
@@ -2250,9 +2259,7 @@ def _read_line(text, memory=None):
         # cost roughly" two lines after "my punto makes a clicking noise" is the price of a
         # repair, and the learning-to-drive rows answered it with 45 hours of lessons. See
         # cars.a_broken_car_is_the_subject.
-        "car_fault": cars.a_broken_car_is_the_subject(
-            # the turn is written to memory after the reading, so these are the earlier lines
-            line["clean"], _user_lines(memory, cars.LOOKBACK)),
+        "car_fault": car_fault,
         # Someone who can call them in wanting a word with them ("the council have written to
         # me", "my sons teacher wants a word"): {"who", "shape"} or None. See kinds.SUMMONS_WHO.
         "summons": read["summons"],
