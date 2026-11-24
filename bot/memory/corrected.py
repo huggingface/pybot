@@ -478,7 +478,12 @@ def _apply_correction(memory, correction, text=""):
                         and NUMBER_VALUE.match(str(target or "").strip() or "-")
                         and NUMBER_VALUE.match(str(wrong or "").strip() or "-"))
     plan_on_the_table = _the_plan_on_the_table(memory)
-    fixed = _correct_plan(memory, target, wrong, text)
+    slot = correction.get("slot") if isinstance(correction, dict) else None
+    slot_value = correction.get("slot_value") if isinstance(correction, dict) else None
+    fixed = (_correct_fact(memory, target, wrong, text, slot=slot, slot_value=slot_value)
+             if slot else None)
+    if not fixed:
+        fixed = _correct_plan(memory, target, wrong, text)
     if not fixed and not (both_numbers and _stated_plan(memory)):
         # A date is read before the numbers are: "the 13th of june" states two values, and the
         # 13 in it is not a number that took the place of the plan's 12 - it is the same date
@@ -1865,7 +1870,7 @@ def _correct_their_birthday(memory, target, wrong, text=""):
     return {"key": "birthday", "value": value, "from": known, "line": line,
             "note": "Got it — " + said_back + "."}
 
-def _correct_fact(memory, target, wrong, text=""):
+def _correct_fact(memory, target, wrong, text="", slot=None, slot_value=None):
     """Replace the fact the previous line stated with the value the user corrected it to.
 
     The value is read in the shape its fact arrives in ("i live in Bristol", "i am 43", "my
@@ -1895,7 +1900,7 @@ def _correct_fact(memory, target, wrong, text=""):
             known["pets"] = pets
             return {"key": "pets", "value": moved}
     named = _fact_naming(memory, wrong)
-    key = named[0] if named else _stated_last(memory)
+    key = slot or (named[0] if named else _stated_last(memory))
     if not key:
         return None
     if key in ("city", "places") and not extract.place_value(target):
@@ -1903,7 +1908,7 @@ def _correct_fact(memory, target, wrong, text=""):
         # has to be a place, so "actually, tree nuts" leaves the city alone instead of keeping a
         # food as where the person lives.
         return None
-    if key != "birthday" and _a_birthday_on_the_last_line(memory):
+    if not slot and key != "birthday" and _a_birthday_on_the_last_line(memory):
         # The line that said the birthday also states it as a date of its own, and one line can
         # log both: a date said again after it is the birthday, whichever entry came last.
         key = "birthday"
@@ -2001,7 +2006,7 @@ def _correct_fact(memory, target, wrong, text=""):
         # bot inventing "you're July" is worse than saying it did not follow. The same guard
         # keeps a job, a city or a diet from being renamed to a month.
         return None
-    found = extract.reread(target, key)
+    found = {slot: slot_value} if slot and slot_value is not None else extract.reread(target, key)
     if not found:
         return None
     if key in ("city", "places"):

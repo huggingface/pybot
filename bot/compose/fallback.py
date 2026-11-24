@@ -13241,7 +13241,7 @@ def reads_as_small_talk(text, memory=None):
         # module never gets the turn. After something the person has just said, chat answers it
         # better than the pool does ("i went to a party tonight" / "did you have a good day" ->
         # "No days like that on my side, so nothing to report - how was yours?").
-        return _an_answer_above(memory)
+        return _knowledge_answer_above(memory)
     return bool(YOUR_OWN_TIME.search(clean) or YOUR_TIME_ASK.search(clean))
 
 
@@ -13286,7 +13286,7 @@ def _a_low_turn_above(memory):
     return False
 
 
-def _an_answer_above(memory):
+def _knowledge_answer_above(memory):
     """True when the bot's last line was the knowledge module's answer to a question.
 
     The same test `bot/memory/repeat.py` makes before it will say an answer again: the turn came
@@ -16188,7 +16188,7 @@ def _a_thread_about_how_somebody_treats_them(turns):
     return False
 
 
-def _an_answer_above(turns):
+def _substantive_answer_above(turns):
     """Did the bot answer above this line, so that the no is how that answer went?
 
     An ack is four or five words ("Got it — the landlord said no" is longer, but the bot's own
@@ -16228,7 +16228,7 @@ def _a_refusal_to_answer(clean, memory, words=None):
     if len(words) > 15:
         return None
     turns = [t for t in (memory.get("turns") or []) if isinstance(t, dict)]
-    if not REFUSED_PARTY.search(clean) and not _an_answer_above(turns):
+    if not REFUSED_PARTY.search(clean) and not _substantive_answer_above(turns):
         # Nobody is named who could say yes next time, and there is no answer above this line for
         # the no to be about: "she said no" on its own is a person turned down in their own life,
         # and "ask once more what would make it a yes" is the wrong thing to say about it.

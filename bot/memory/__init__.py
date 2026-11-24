@@ -166,6 +166,9 @@ def remember_other(memory, entry, text=""):
     if not isinstance(entry, dict) or not any(entry.values()):
         return
     who = entry.get("who") or ""
+    if who and not who.startswith("other ") and _said_another(text, who):
+        who = "other " + who
+        entry["who"] = who
     # Two children said under the same word are two people: "my kids are ada 7 and sam 4" is not
     # one child called Sam aged 4. A name on the entry is what tells them apart, so a named entry
     # only joins a person with the same name - or one that has no name yet.

@@ -825,7 +825,7 @@ WORD_NUMBERS = {
 # back keeps them; every other word after it is the rest of the sentence.
 FIGURE_SIZE_WORDS = frozenset("""k ks grand thousand million millionaire billion bn mil mths""".split())
 
-NUMBER_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(%|[a-z]+)?")
+NUMBER_RE = re.compile(r"((?:\d+(?:[.,]\d+)?|\.\d+))\s*(%|[a-z]+)?")
 
 # A unit clipped to its first letters, which is only the unit right after a figure: "a 60 yr
 # old", "6 mths old", "2 wks off". Only the forms a figure can be followed by are here, and
@@ -3897,7 +3897,7 @@ def _thing(word):
     return None
 
 
-WORD_DIGITS = re.compile(r"[0-9]+(?:[.,][0-9]+)?")
+WORD_DIGITS = re.compile(r"(?:[0-9]+(?:[.,][0-9]+)?|\.[0-9]+)")
 
 # A word in front of a relation makes a different relation, and people say these far more often
 # than the plain list suggests: a stepson is not the son, and a grandson is not the son either.

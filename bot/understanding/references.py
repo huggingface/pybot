@@ -10,7 +10,7 @@ is None and `followup` is False.
 import re
 import string
 
-from . import topics
+from . import cars, topics
 
 PRONOUNS = {
     "it": ("it", "its", "itself"),
@@ -267,19 +267,12 @@ def _only_the_purpose(line):
 # the night waking it followed, word for word.
 #
 # What tells a placeholder from a pronoun that does point back is whether the clause after it
-# names a thing of its own. "is it safe to drink the tap water" says "the tap water", so the line
-# has its own thing and the place the last turn named is what makes the answer land ("Tap water
-# in Rome is safe to drink"); "is it worth getting a new one" says "one", so it is still the
-# boiler. Only a clause that names nothing - an activity and a frequency, "to run every day" -
-# is the frame's own placeholder.
+# leans on something earlier. A determiner introduces the line's own subject ("the tap water"),
+# so the frame's "it" is still only a hole. "one", "it" and the other pointing words keep the
+# clause tied to the last turn, as does a sentence that stops on a linking preposition.
 PLACEHOLDER_IT = re.compile(
     r"^(?:is|was|would|will|does|did|can|could|should)(?:n'?t)?\s+it\s+"
     r"(?:[a-z']+\s+){0,3}?to\s+[a-z]+")
-# A thing of the line's own: an article or a possessive and the word it belongs to. "a pint" and
-# "the sea" count, because a line that picks out a thing is about that thing and not about the
-# last turn.
-NAMES_A_THING = re.compile(
-    r"\b(?:a|an|the|some|any|my|your|our|their|his|her|its|another)\s+[a-z]", re.I)
 # A word that stands for something said earlier. A clause carrying one is leaning on the last
 # turn even when it names nothing with an article: "is it ok to use it in the rain".
 STANDS_FOR_SOMETHING = frozenset("""it its them they that this these those him her one ones
@@ -302,12 +295,16 @@ def _a_placeholder_it(line):
     if not frame:
         return False
     rest = said[frame.end():]
-    if NAMES_A_THING.search(rest):
-        return False
     if set(rest.split()) & STANDS_FOR_SOMETHING:
         return False
     tail = rest.split()[-1:]
     return not (tail and tail[0] in LEAVES_SOMETHING_OUT)
+
+
+def is_placeholder_it(text):
+    """Whether a line's `it` belongs to its own placeholder frame."""
+    from .normalize import normalise
+    return _a_placeholder_it(normalise(text))
 
 
 # The animal a line only points at. A person who has just said "my cat milly is 12" does not say
@@ -430,7 +427,7 @@ def the_animal_in_hand(ref, words):
     return ""
 
 
-def resolve(line, read, prev_line=None, prev_entities=None, prev_topic=None):
+def resolve(line, read, prev_line=None, prev_entities=None, prev_topic=None, car_fault=False):
     """{"it", "that", "they", "there", "followup"} for the current line."""
     prev_entities = prev_entities or []
     words = set(line["norm"])
@@ -446,6 +443,8 @@ def resolve(line, read, prev_line=None, prev_entities=None, prev_topic=None):
     reference = bool(used["it"] or used["that"] or used["they"] or used["there"]
                      or used["he"] or used["she"])
     placeholder = _a_placeholder_it(line)
+    if placeholder and car_fault and set(line["norm"]) & topics.DRIVES:
+        placeholder = False
     starts = " ".join(line["norm"][:4])
     opens_like_followup = any(starts == phrase or starts.startswith(phrase + " ")
                               for phrase in FOLLOWUP_STARTS) or _only_the_purpose(line)

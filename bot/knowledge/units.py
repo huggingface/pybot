@@ -416,7 +416,7 @@ def _build():
 
 
 _NAMES, _UNIT_WORD = _build()
-_NUMBER = re.compile(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?|a|an|one)(?![\w])")
+_NUMBER = re.compile(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?|\.\d+|a|an|one)(?![\w])")
 _TARGET = re.compile(r"(?:to|in|into|as|->|=)\s*$")
 _SAY_K = re.compile(r"(\d)\s*k\b")
 
@@ -480,7 +480,7 @@ def _fmt(value):
     elif size >= 1:
         text = f"{value:.1f}"
     else:
-        text = f"{value:.2f}"
+        text = f"{value:.6g}"
     if "." in text:
         text = text.rstrip("0").rstrip(".")
     return text

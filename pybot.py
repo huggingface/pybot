@@ -75,10 +75,20 @@ def details(module, seconds):
     return "[module: %s | %.0f ms]" % (module or "none", seconds * 1000)
 
 
+def _write_line(stream, text):
+    try:
+        stream.write(text + "\n")
+    except UnicodeEncodeError:
+        encoding = stream.encoding or "utf-8"
+        safe = text.encode(encoding, errors="backslashreplace").decode(encoding)
+        stream.write(safe + "\n")
+    stream.flush()
+
+
 def one_shot(runtime, args):
     """-p without -i: print the reply to one message and exit."""
     reply, module, seconds = answer(runtime, args.prompt, {})
-    print(reply, flush=True)
+    _write_line(sys.stdout, reply)
     if args.verbose:
         print(details(module, seconds), file=sys.stderr)
 
@@ -88,7 +98,7 @@ def pipe(runtime, args):
     memory = {}
     for line in sys.stdin:
         reply, module, seconds = answer(runtime, line.rstrip("\r\n"), memory)
-        print(reply, flush=True)
+        _write_line(sys.stdout, reply)
         if args.verbose:
             print(details(module, seconds), file=sys.stderr, flush=True)
 
@@ -127,7 +137,7 @@ def chat(runtime, args):
     while True:
         if first is not None:
             text, first = first, None
-            print(USER_PREFIX + text)
+            _write_line(sys.stdout, USER_PREFIX + text)
         else:
             try:
                 text = input(USER_PREFIX)
@@ -153,7 +163,7 @@ def chat(runtime, args):
         if not command:
             continue
         reply, module, seconds = answer(runtime, text, memory)
-        print(BOT_PREFIX + reply)
+        _write_line(sys.stdout, BOT_PREFIX + reply)
         if args.verbose:
             print(details(module, seconds))
         print()

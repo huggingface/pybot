@@ -8,7 +8,7 @@ the module imports them back, so no call site and no reply changes.
 """
 
 from bot.compose import pick
-from bot.memory import history
+from bot.memory import ANOTHER_ONE, history
 from bot.memory import facts as extract
 from bot.memory import last_bot
 from bot.memory import others
@@ -144,6 +144,7 @@ def _newest_first(people, memory):
     mention of each person comes first; a person named twice takes their newest place.
     """
     order = []
+    people = sorted(dict.fromkeys(people), key=len, reverse=True)
     for entry in reversed(memory.get("facts_log") or ()):
         if not isinstance(entry, dict):
             continue
@@ -174,6 +175,17 @@ def _named_person(low, memory=None):
     store empty, "how old are my grandparents" is not "you haven't told me how old your grandparent
     is", because the line gave the ages itself and the plural is a group the store does not keep.
     """
+    if memory is not None:
+        qualifiers = "|".join(sorted(ANOTHER_ONE, key=len, reverse=True))
+        for entry in others(memory):
+            name = str(entry.get("who") or "").strip().lower()
+            if not name.startswith("other "):
+                continue
+            relation = re.escape(name[len("other "):])
+            match = re.search(r"\b(?:" + qualifiers + r")\s+(?:little\s+|big\s+)?"
+                              + relation + r"s?\b", low)
+            if match and PERSON_AFTER.match(low[match.end():]):
+                return name
     # A pair of people named as one ("my partner's mum", "my sisters husband") is the person the
     # store filed the age against: read word by word the ask lands on "mum" and answers "You
     # haven't told me how old your mum is" about a line that gave her age. The pair is looked for

@@ -21,8 +21,11 @@ import pybot  # noqa: E402
 
 
 def run(args, stdin=None):
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run([sys.executable, "-m", "pybot"] + args, input=stdin, capture_output=True,
-                          text=True, cwd=ROOT, timeout=600)
+                          text=True, encoding="utf-8", errors="strict", env=env,
+                          cwd=ROOT, timeout=600)
 
 
 class Terminal(io.StringIO):
@@ -149,9 +152,12 @@ class OneShotAndPipeStayPlain(unittest.TestCase):
     def test_piped_input_matches_the_bots_own_loop(self):
         typed = "hello\nhow do i descale a kettle\nhow long does that take\n\nthanks\n"
         mine = run(["-s", "0"], stdin=typed)
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
         theirs = subprocess.run(
             [sys.executable, "-c", "import random; random.seed(0); from bot.__main__ import main; main()"],
-            input=typed, capture_output=True, text=True, cwd=ROOT, timeout=600)
+            input=typed, capture_output=True, text=True, encoding="utf-8", errors="strict",
+            env=env, cwd=ROOT, timeout=600)
         self.assertEqual(mine.returncode, 0)
         self.assertEqual(mine.stdout, theirs.stdout)
         self.assertEqual(len(mine.stdout.splitlines()), 5)

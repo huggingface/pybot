@@ -25,7 +25,7 @@ from . import lexicon
 # who typed it: "p60", "p45", "a1", "m25", "s21", "b12", "t4". Split into "p" and "60" the
 # name is lost, so a knowledge entry keyed on it never matches and a question about it reads
 # as a question about a number.
-_MEASURE = (r"[0-9]+(?:[.,][0-9]+)*[a-z%]*"
+_MEASURE = (r"(?:[0-9]+(?:[.,][0-9]+)*|\.[0-9]+)[a-z%]*"
             r"|[a-z]{1,3}[0-9]+(?:[a-z]{1,3}[0-9]*)*(?![a-z0-9])"
             r"|[a-z]+(?:'[a-z]+)*")
 WORD = re.compile(_MEASURE)
